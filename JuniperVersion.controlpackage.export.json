@@ -1,0 +1,94 @@
+{
+  "assessments": [],
+  "controls": [
+    {
+      "id": "eca59354-4bdb-4754-acb2-eeffb756860d",
+      "controlCode": "UD-01445",
+      "controlType": "REGEX",
+      "domainId": 1,
+      "name": "Juniper Version Check",
+      "description": "This control uses regex to extract JunOS versions.",
+      "severity": 1,
+      "system": false,
+      "properties": [
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "FailWhenResultsExist",
+          "type": "BOOLEAN",
+          "displayName": "Fail When Results Exist",
+          "required": true,
+          "booleanValue": true
+        },
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "FilenamesToSearch",
+          "type": "STRING",
+          "displayName": "Filenames To Search",
+          "required": false
+        },
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "InfoOnly",
+          "type": "BOOLEAN",
+          "displayName": "Information Only",
+          "required": true,
+          "booleanValue": true
+        },
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "MaxLineLength",
+          "type": "INTEGER",
+          "displayName": "Max Line Length",
+          "required": true,
+          "integerValue": 160
+        },
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "Pattern",
+          "type": "STRING",
+          "displayName": "Pattern",
+          "required": true,
+          "string": "(?:<version>).*"
+        },
+        {
+          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlType": "REGEX",
+          "name": "SearchAllFiles",
+          "type": "BOOLEAN",
+          "displayName": "Search All Files",
+          "required": true,
+          "booleanValue": true
+        }
+      ],
+      "filters": [
+        {
+          "id": "a4da1e9d-035b-40b3-a183-32c4ffca7b9f",
+          "type": "VENDOR",
+          "vendor": "Juniper Networks"
+        },
+        {
+          "id": "a33ab989-ad4c-4259-9ffa-51b93a4b6d30",
+          "type": "DEVICE_TYPE",
+          "deviceType": "FIREWALL"
+        },
+        {
+          "id": "11c9f317-486e-439b-a507-69182f345ff0",
+          "type": "DEVICE_TYPE",
+          "deviceType": "ROUTER_SWITCH"
+        }
+      ],
+      "createdBy": "adam",
+      "createdDate": "2024-07-18T23:33:38.376Z",
+      "lastModifiedBy": "adam",
+      "lastModifiedDate": "2024-07-18T23:33:38.376Z",
+      "observesSystemRules": false
+    }
+  ],
+  "zones": [],
+  "services": []
+}

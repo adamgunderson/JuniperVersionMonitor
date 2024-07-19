@@ -1,4 +1,5 @@
 import csv
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -7,35 +8,37 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
 def get_html_content(url):
-    # Set up Selenium with Chrome
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-    chrome_options.add_argument("--no-sandbox")  # Bypass OS security model
-    chrome_options.add_argument("--disable-gpu")  # Applicable to windows os only
-    chrome_options.add_argument("--window-size=1920x1080")  # Set window size
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920x1080")
 
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
     
-    # Load the page
     driver.get(url)
-    
-    # Get the page source
     page_source = driver.page_source
-    
-    # Close the browser
     driver.quit()
     
-    # Parse the HTML with BeautifulSoup
     soup = BeautifulSoup(page_source, 'html.parser')
-    
-    # Find the table with EOL information
     table = soup.find('table')
     if table:
         return table
     else:
         print("Error: Could not find the table in the HTML content.")
         return None
+
+def clean_product_name(product_name):
+    soup = BeautifulSoup(product_name, 'html.parser')
+    # Remove all <sup> tags and their contents
+    for sup in soup.find_all('sup'):
+        sup.decompose()
+    # Get text and strip any surrounding whitespace
+    cleaned_name = soup.get_text().strip()
+    # Further clean up by removing any remaining unwanted characters and extra spaces
+    cleaned_name = re.sub(r'[^a-zA-Z0-9\s\.\-X]', '', cleaned_name).strip()
+    return cleaned_name
 
 def parse_table(table):
     rows = table.find_all('tr')
@@ -45,7 +48,10 @@ def parse_table(table):
     for row in rows[1:]:
         columns = row.find_all('td')
         if len(columns) > 0:
-            data.append([col.text.strip() for col in columns])
+            product_name = str(columns[0])
+            cleaned_product_name = clean_product_name(product_name)
+            cleaned_row = [cleaned_product_name] + [col.text.strip() for col in columns[1:]]
+            data.append(cleaned_row)
     
     return header, data
 

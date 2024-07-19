@@ -49,7 +49,7 @@ df_extracted = pd.DataFrame(data)
 df_extracted = df_extracted.drop_duplicates()
 
 # Save to CSV
-csv_file_path_extracted = "juniper_junos_extracted_vulnerabilities.csv"
+csv_file_path_extracted = "juniper_vulnerabilities.csv"
 df_extracted.to_csv(csv_file_path_extracted, index=False)
 
 print(f"CSV file saved to {csv_file_path_extracted}")

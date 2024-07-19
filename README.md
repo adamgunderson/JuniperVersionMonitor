@@ -3,7 +3,7 @@ Checks for devices running JunOS versions with known vulnerabilities and/or EOL.
 
 
 ## scrapeEOL.py
-This script is used to scrape EOL versions and dates from juniper.net and save them as a CCV.
+This script is used to scrape EOL versions and dates from juniper.net and save them as a CSV.
 
 Additional Python Libraries are required:
 - pip install selenium

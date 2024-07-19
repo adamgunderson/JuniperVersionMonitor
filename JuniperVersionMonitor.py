@@ -8,6 +8,7 @@ from email.mime.application import MIMEApplication
 import csv
 import requests
 import logging
+import os
 from datetime import datetime, timedelta
 from io import StringIO
 
@@ -18,8 +19,8 @@ password = 'firemon'
 device_group_id = 1
 control_id = 'eca59354-4bdb-4754-acb2-eeffb756860d'
 csv_file_path = 'juniper_vulnerabilities.csv'
-eol_csv_file_path = 'juniper_eol.csv'
-log_file_path = 'firemon_juniper_version.log'
+eol_csv_file_path = 'juniper_eol_cleaned.csv'
+log_file_path = 'firemon_device_check.log'
 ignore_certificate = True
 enable_logging = True  # Set to False to disable logging
 logging_level = logging.DEBUG  # Set the desired logging level
@@ -124,6 +125,10 @@ def get_device_version(token, device_id):
 # Function to parse vulnerabilities from a CSV file
 def parse_vulnerabilities(csv_file_path):
     vulnerabilities = {}
+    if not os.path.exists(csv_file_path):
+        if enable_logging:
+            logging.warning(f'Vulnerability CSV file not found: {csv_file_path}')
+        return vulnerabilities
     try:
         with open(csv_file_path, mode='r') as csvfile:
             reader = csv.reader(csvfile)
@@ -144,6 +149,10 @@ def parse_vulnerabilities(csv_file_path):
 # Function to parse EOL data from a CSV file
 def parse_eol_data(csv_file_path):
     eol_data = {}
+    if not os.path.exists(csv_file_path):
+        if enable_logging:
+            logging.warning(f'EOL CSV file not found: {csv_file_path}')
+        return eol_data
     try:
         with open(csv_file_path, mode='r') as csvfile:
             reader = csv.reader(csvfile)

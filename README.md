@@ -1,4 +1,4 @@
-# Juniper Version Monitor
+# Juniper Version Monitor for FireMon
 Checks for devices running JunOS versions with known vulnerabilities and/or EOL.
 
 

@@ -48,7 +48,7 @@ python3 eol-scrape/bin/pip install chardet
 ```
 Test that the script now runs successfully.
 ```console
-python3 scrape-hw-eol.py 
+python3 scrapeEOL.py 
 ```
 Create the cronjob for the script to run. The EOL pages likely don't update very often so it would be reasonable for the cron run infrequently. The following cron example will run the script once per month. 
 Check your home directory path.

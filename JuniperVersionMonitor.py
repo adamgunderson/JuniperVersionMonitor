@@ -19,22 +19,25 @@ username = 'firemon'
 password = 'firemon'
 device_group_id = 1
 control_id = 'eca59354-4bdb-4754-acb2-eeffb756860d'
-vulnerabilities_csv_path = 'juniper_vulnerabilities.csv'  # Input file of vulnerabilities, gernerated with scrapeMitre.py
-eol_csv_file_path = 'juniper_eol.csv'  # Input file of EOL versions and dates, generated with scrapeMitre.py
-ignore_certificate = True  # Ignore SSL certificate, useful for self-signed certs.
-
-# EOL notification configuration
-eol_notification_months = 6  # Notify if device will be EOL within this many months
-list_all_eol_dates = True  # List all support EOL dates for each device
+vulnerabilities_csv_path = 'juniper_vulnerabilities.csv'
+eol_csv_file_path = 'juniper_eol.csv'
+ignore_certificate = True # Ignore certificate validation, usefol for self-signed certificates
 
 # Alert options
+enable_email_alert = True
 output_to_console = True
 output_to_csv = True  # Set to False to disable saving CSV locally
-output_csv_path = 'vulnerable_devices_report.csv'
-enable_email_alert = True
+output_csv_path = 'juniper_vulns-and-eol.csv'
+
+# Logging
+enable_logging = True  # Set to False to disable logging
+log_file_path = 'firemon_device_check.log'
+logging_level = logging.DEBUG  # Set the desired logging level
+max_log_size = 10 * 1024 * 1024  # 10 MB
+backup_log_count = 5  # Number of backup log files to keep
 
 # Email configuration
-include_csv_attachment = True
+include_csv_attachment = True # True adds CSV attachment, False has results in email body
 email_sender = 'JuniperVuls@firemon.com'
 email_recipient = 'adam.gunderson@firemon.com'
 email_server = 'localhost'
@@ -44,16 +47,9 @@ email_password = ''
 email_subject = 'Vulnerable Juniper Devices Report'
 use_smtp_auth = False
 
-# Logging
-enable_logging = True  # Set to False to disable logging
-log_file_path = 'firemon_device_check.log'
-logging_level = logging.DEBUG  # Set the desired logging level
-max_log_size = 10 * 1024 * 1024  # 10 MB
-backup_log_count = 5  # Number of backup log files to keep
-
-#################################################
-##        NO CONFIGURATION NEEDED BELOW        ##
-#################################################
+# EOL notification configuration
+eol_notification_months = 6  # Notify if device will be EOL within this many months
+list_all_eol_dates = True  # List all support EOL dates for each device
 
 # Set up logging
 if enable_logging:
@@ -251,6 +247,7 @@ def main():
         for device in devices:
             vendor = device.get('devicePack', {}).get('vendor', '')
             artifact_id = device.get('devicePack', {}).get('artifactId', '')
+            management_ip = device.get('managementIp', 'N/A')
             if vendor == 'Juniper Networks' and artifact_id in ['juniper_ex', 'juniper_mseries', 'juniper_srx', 'juniper_qfx']:
                 device_id = device.get('id', '')
                 device_name = device.get('name', '')
@@ -260,8 +257,10 @@ def main():
                     eol_date = check_eol_status(device_version, eol_data)
                     if cves or (eol_date and eol_date <= datetime.now() + timedelta(days=eol_notification_months*30)) or list_all_eol_dates:
                         findings.append({
+                            'Device ID': device_id,
                             'Device Name': device_name,
                             'Device Version': device_version,
+                            'Management IP': management_ip,
                             'Vulnerabilities': ', '.join(cves) if cves else 'None',
                             'EOL Date': eol_date.strftime('%Y-%m-%d') if eol_date else 'None'
                         })
@@ -272,7 +271,7 @@ def main():
                     print(finding)
             if output_to_csv:
                 with open(output_csv_path, 'w', newline='') as csvfile:
-                    fieldnames = ['Device Name', 'Device Version', 'Vulnerabilities', 'EOL Date']
+                    fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities', 'EOL Date']
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     for finding in findings:

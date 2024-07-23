@@ -21,7 +21,7 @@ Additional Python Libraries are required:
 - pip install webdriver_manager
 - pip install beautifulsoup4
 
-### Running in FMOS ###
+### Running Scrape Scripts in FMOS ###
 Installing these additional libraries on FMOS requires the use of a python virtual environment (venv). Follow the instructions below to create a a python virtual environment and set the script to run on the cron schedule.
 
 Create the venv

@@ -9,17 +9,17 @@ import requests
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import json
 from datetime import datetime, timedelta
 from io import StringIO
-
 
 # Configuration
 firemon_host = 'https://localhost'
 username = 'firemon'
 password = 'firemon'
 device_group_id = 1
-control_id = '29ed86b8-b81f-4e06-b4a6-da9c62300d3f'
-vulnerabilities_csv_path = 'juniper_vulnerabilities.csv'
+control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'
+cpe_data_path = 'junos_cves.json'
 eol_csv_file_path = 'juniper_eol.csv'
 ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
 
@@ -50,10 +50,6 @@ use_smtp_auth = False
 # EOL notification configuration
 eol_notification_months = 6  # Notify if device will be EOL within this many months
 list_all_eol_dates = False  # List all support EOL dates for each device
-
-###########################
-##   END CONFIGURATION   ##
-###########################
 
 # Set up logging
 if enable_logging:
@@ -128,29 +124,23 @@ def get_device_version(token, device_id):
             logging.error(f'Error retrieving version for device ID {device_id}: {e}')
         return None
 
-# Function to parse vulnerabilities from a CSV file
-def parse_vulnerabilities(csv_file_path):
-    vulnerabilities = {}
-    if not os.path.exists(csv_file_path):
+# Function to parse vulnerabilities from a JSON file
+def parse_cpe_data(json_file_path):
+    cpe_data = []
+    if not os.path.exists(json_file_path):
         if enable_logging:
-            logging.warning(f'Vulnerability CSV file not found: {csv_file_path}')
-        return vulnerabilities
+            logging.warning(f'CPE JSON file not found: {json_file_path}')
+        return cpe_data
     try:
-        with open(csv_file_path, mode='r') as csvfile:
-            reader = csv.reader(csvfile)
-            next(reader)  # Skip header
-            for row in reader:
-                if len(row) < 2:
-                    continue
-                version, cve = row[:2]
-                vulnerabilities.setdefault(version, []).append(cve)
+        with open(json_file_path, 'r') as jsonfile:
+            cpe_data = json.load(jsonfile)
         if enable_logging:
-            logging.info(f'Parsed vulnerabilities: {vulnerabilities}')
+            logging.info(f'Parsed CPE data: {cpe_data}')
     except Exception as e:
         if enable_logging:
-            logging.error(f'Error parsing vulnerabilities: {e}')
+            logging.error(f'Error parsing CPE data: {e}')
         raise
-    return vulnerabilities
+    return cpe_data
 
 # Function to parse EOL data from a CSV file
 def parse_eol_data(csv_file_path):
@@ -204,32 +194,41 @@ def parse_version(version):
             logging.error(f'Error parsing version: {e}')
         return []
 
-# Function to compare versions considering sub-versions
-def is_version_affected(device_version, vuln_version):
+# Function to check if the device version matches the CPE version pattern
+def match_versions(device_version, cpe_version):
     device_parts = parse_version(device_version)
-    vuln_parts = parse_version(vuln_version)
-    return device_parts[:len(vuln_parts)] == vuln_parts
+    cpe_parts = parse_version(cpe_version)
 
-# Function to check if a device is vulnerable
-def check_vulnerabilities(device_version, vulnerabilities):
+    for device_part, cpe_part in zip(device_parts, cpe_parts):
+        if device_part == cpe_part or cpe_part == "*":
+            continue
+        if isinstance(device_part, list) and isinstance(cpe_part, list):
+            for dp, cp in zip(device_part, cpe_part):
+                if dp != cp and cp != "*":
+                    return False
+        else:
+            return False
+    return True
+
+# Function to check if a device is vulnerable based on CPE data
+def check_vulnerabilities(device_version, cpe_data):
     cves = []
-    for vuln_version, vuln_cves in vulnerabilities.items():
-        if is_version_affected(device_version, vuln_version):
-            cves.extend(vuln_cves)
-    return list(set(cves))
+    for entry in cpe_data:
+        cpe_version = entry['cpe'].split(':')[5]
+        if match_versions(device_version, cpe_version):
+            cves.append(entry['cve'])
+    return cves
 
-# Function to check EOL status
+# Function to check EOL status of a device
 def check_eol_status(device_version, eol_data):
     eol_date = None
     device_parts = parse_version(device_version)
     most_specific_length = 0
     for eol_version, date in eol_data.items():
         eol_parts = parse_version(eol_version)
-        logging.debug(f'Comparing {device_parts} to {eol_parts}')
         if device_parts[:len(eol_parts)] == eol_parts and len(eol_parts) > most_specific_length:
             eol_date = date
             most_specific_length = len(eol_parts)
-            logging.debug(f'Found matching EOL version: {eol_version} with date {eol_date}')
     return eol_date
 
 # Function to send an email with the results
@@ -264,17 +263,17 @@ def main():
         token = authenticate()
         devices = get_devices(token)
 
-        vulnerabilities = {}
-        if os.path.exists(vulnerabilities_csv_path):
-            vulnerabilities = parse_vulnerabilities(vulnerabilities_csv_path)
+        cpe_data = []
+        if os.path.exists(cpe_data_path):
+            cpe_data = parse_cpe_data(cpe_data_path)
 
         eol_data = {}
         if os.path.exists(eol_csv_file_path):
             eol_data = parse_eol_data(eol_csv_file_path)
 
-        if not vulnerabilities and not eol_data:
+        if not cpe_data and not eol_data:
             if enable_logging:
-                logging.info("No vulnerability or EOL data available. Nothing to do.")
+                logging.info("No CPE or EOL data available. Nothing to do.")
             return
 
         findings = []
@@ -299,8 +298,8 @@ def main():
 
                     has_findings = False
 
-                    if vulnerabilities:
-                        cves = check_vulnerabilities(device_version, vulnerabilities)
+                    if cpe_data:
+                        cves = check_vulnerabilities(device_version, cpe_data)
                         if cves:
                             result['Vulnerabilities'] = ', '.join(cves)
                             total_vulnerable_devices += 1
@@ -324,7 +323,7 @@ def main():
             if output_to_csv:
                 with open(output_csv_path, 'w', newline='') as csvfile:
                     fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP']
-                    if vulnerabilities:
+                    if cpe_data:
                         fieldnames.append('Vulnerabilities')
                     if eol_data:
                         fieldnames.append('EOL Date')
@@ -337,7 +336,7 @@ def main():
                 email_body = (
                     f"Total devices checked: {len(devices)}\n"
                 )
-                if vulnerabilities:
+                if cpe_data:
                     email_body += f"Devices with vulnerabilities: {total_vulnerable_devices}\n"
                 if eol_data:
                     email_body += f"Devices that are EOL: {total_eol_devices}\n"

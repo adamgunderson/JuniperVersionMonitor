@@ -47,6 +47,9 @@ python3 eol-scrape/bin/pip install requests
 python3 eol-scrape/bin/pip install BeautifulSoup4
 ```
 ```console
+python3 eol-scrape/bin/pip install webdriver_manager
+```
+```console
 python3 eol-scrape/bin/pip install chardet 
 ```
 Test that the script now runs successfully.

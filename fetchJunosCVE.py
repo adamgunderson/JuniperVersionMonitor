@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.9/site-packages')  # Adjust this path based on your version of FMOS.
+import smtplib
 import requests
 import json
 import time

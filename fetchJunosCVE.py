@@ -5,7 +5,7 @@ import requests
 import json
 import time
 
-API_KEY = "dc0daa38-47e3-4908-bd19-9aeb44ee9793"  # Set this to None or "" if no API key is used
+API_KEY = ""  # Set this to None or "" if no API key is used
 CPE_BASE_URL = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
 CVE_BASE_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 

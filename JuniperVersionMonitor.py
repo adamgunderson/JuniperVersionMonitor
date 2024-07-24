@@ -13,6 +13,10 @@ import json
 from datetime import datetime, timedelta
 from io import StringIO
 
+#########################
+## Begin Configuration ##
+#########################
+
 # Configuration
 firemon_host = 'https://localhost'
 username = 'firemon'
@@ -23,6 +27,9 @@ cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
 eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates
 ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
 
+# EOL checking configuration
+eol_notification_months = 6  # List if device will be EOL within this many months
+
 # Alert options
 enable_email_alert = True
 output_to_console = True
@@ -31,7 +38,7 @@ output_csv_path = 'juniper_version_report.csv'
 
 # Logging
 enable_logging = True  # Set to False to disable logging
-log_file_path = 'firemon_device_check.log'
+log_file_path = 'juniper_version_report.log'
 logging_level = logging.DEBUG  # Set the desired logging level
 max_log_size = 10 * 1024 * 1024  # 10 MB
 backup_log_count = 5  # Number of backup log files to keep
@@ -47,9 +54,11 @@ email_password = ''
 email_subject = 'Juniper Version Report'
 use_smtp_auth = False
 
-# EOL notification configuration
-eol_notification_months = 6  # Notify if device will be EOL within this many months
-list_all_eol_dates = False  # List all support EOL dates for each device
+#######################
+## End Configuration ##
+#######################
+
+
 
 # Set up logging
 if enable_logging:
@@ -169,10 +178,6 @@ def parse_eol_data(csv_file_path):
         if enable_logging:
             logging.error(f'Error parsing EOL data: {e}')
         raise
-
-    # Correct specific EOL date
-    if '12.1X47' in eol_data:
-        eol_data['12.1X47-D18.2'] = datetime.strptime('2017/02/18', '%Y/%m/%d')
 
     return eol_data
 
@@ -310,13 +315,12 @@ def main():
 
                     if eol_data_exists and eol_data:
                         eol_date = check_eol_status(device_version, eol_data)
-                        if eol_date:
+                        if eol_date and eol_date <= datetime.now() + timedelta(days=eol_notification_months * 30):
                             result['EOL Date'] = eol_date.strftime('%Y-%m-%d')
-                            if eol_date <= datetime.now() + timedelta(days=eol_notification_months * 30):
-                                total_eol_devices += 1
+                            total_eol_devices += 1
                             has_findings = True
 
-                    if has_findings or (list_all_eol_dates and 'EOL Date' in result):
+                    if has_findings:
                         findings.append(result)
 
         if findings:
@@ -326,8 +330,10 @@ def main():
                 for finding in findings:
                     print(finding)
             if output_to_csv:
+                fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities']
+                if any('EOL Date' in finding for finding in findings):
+                    fieldnames.append('EOL Date')
                 with open(output_csv_path, 'w', newline='') as csvfile:
-                    fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities', 'EOL Date']
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     for finding in findings:

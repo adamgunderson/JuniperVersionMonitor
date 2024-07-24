@@ -14,9 +14,15 @@ Standard FMOS Python libraries are used, so this can be ran directly in FMOS.
 This script is used to scrape EOL versions and dates from juniper.net and saves them in juniper_eol.csv.
 
 Additional Python Libraries are required:
-- pip install selenium
-- pip install webdriver_manager
-- pip install beautifulsoup4
+```console
+pip install selenium
+```
+```console
+pip install webdriver_manager
+```
+```console
+pip install beautifulsoup4
+```
 
 ### Running scrapeEOL.py in FMOS ###
 Installing these additional libraries on FMOS requires the use of a python virtual environment (venv). Follow the instructions below to create a a python virtual environment and set the script to run on the cron schedule.

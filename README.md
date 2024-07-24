@@ -4,14 +4,11 @@ Checks for devices running JunOS versions with known vulnerabilities and/or EOL.
 
 ## JuniperVersionMonitor.py
 Script that checks for vulnerabilities or EOL versions. Can be ran directly on FMOS with no additional python packages, ad-hoc or on a cron schedule. 
-This script references juniper_eol.csv (generated using scrapeEOL.py) and juniper_vulnerabilities.csv (generated using scrapeMitre.py).
+This script references juniper_eol.csv (generated using scrapeEOL.py) and junos_cves.json (generated using fetchJunosCVE.py).
 
-
-## scrapeMitre.py
-This script is used to scrape CVE's and vulnerable JunOS versions from mitre.org and saves them in juniper_vulnerabilities.csv.
-
-Additional Python Libraries are required:
-- pip install beautifulsoup4
+## fetchJunosCVE.py
+This script downloaded CPE and CVE data from nvd.nist.gov and stored as junos_cves.json. API key is optional. Rate limit to 5 requests per 30 seconds if no API key, and 50 requests per 30 seconds with API key.
+Standard FMOS Python libraries are used, so this can be ran directly in FMOS.
 
 ## scrapeEOL.py
 This script is used to scrape EOL versions and dates from juniper.net and saves them in juniper_eol.csv.
@@ -21,7 +18,7 @@ Additional Python Libraries are required:
 - pip install webdriver_manager
 - pip install beautifulsoup4
 
-### Running Scrape Scripts in FMOS ###
+### Running scrapeEOL.py in FMOS ###
 Installing these additional libraries on FMOS requires the use of a python virtual environment (venv). Follow the instructions below to create a a python virtual environment and set the script to run on the cron schedule.
 
 Create the venv

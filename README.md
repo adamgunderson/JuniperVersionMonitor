@@ -8,7 +8,8 @@ Script that checks for vulnerabilities or EOL versions. Can be ran directly on F
 This script references juniper_eol.csv (generated using scrapeEOL.py) and junos_cves.json (generated using fetchJunosCVE.py).
 
 ## fetchJunosCVE.py
-This script downloaded CPE and CVE data from nvd.nist.gov and stored as junos_cves.json. API key is optional. Rate limit to 5 requests per 30 seconds if no API key, and 50 requests per 30 seconds with API key.
+This script downloaded CPE and CVE data from nvd.nist.gov and stored as junos_cves.json. API key is optional. Rate limit to 5 requests per 30 seconds if no API key, and 50 requests per 30 seconds with API key. API Keys can be requested here: https://nvd.nist.gov/developers/request-an-api-key
+
 Standard FMOS Python libraries are used, so this can be ran directly in FMOS.
 
 ## scrapeEOL.py

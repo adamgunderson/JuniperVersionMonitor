@@ -17,17 +17,17 @@ from io import StringIO
 firemon_host = 'https://localhost'
 username = 'firemon'
 password = 'firemon'
-device_group_id = 1
+device_group_id = 5  # Default device group to 5
 control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'
-cpe_data_path = 'junos_cves.json'
-eol_csv_file_path = 'juniper_eol.csv'
+cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
+eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates
 ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
 
 # Alert options
 enable_email_alert = True
 output_to_console = True
 output_to_csv = True  # Set to False to disable saving CSV locally
-output_csv_path = 'juniper_device_findings.csv'
+output_csv_path = 'juniper_version_report.csv'
 
 # Logging
 enable_logging = True  # Set to False to disable logging
@@ -38,13 +38,13 @@ backup_log_count = 5  # Number of backup log files to keep
 
 # Email configuration
 include_csv_attachment = True  # True adds CSV attachment, False has results in email body
-email_sender = 'JuniperVuls@firemon.com'
+email_sender = 'JuniperVersionReport@firemon.com'
 email_recipient = 'adam.gunderson@firemon.com'
 email_server = 'localhost'
 email_port = 25
 email_username = ''
 email_password = ''
-email_subject = 'Vulnerable Juniper Devices Report'
+email_subject = 'Juniper Version Report'
 use_smtp_auth = False
 
 # EOL notification configuration
@@ -212,12 +212,12 @@ def match_versions(device_version, cpe_version):
 
 # Function to check if a device is vulnerable based on CPE data
 def check_vulnerabilities(device_version, cpe_data):
-    cves = []
+    cves = set()
     for entry in cpe_data:
         cpe_version = entry['cpe'].split(':')[5]
         if match_versions(device_version, cpe_version):
-            cves.append(entry['cve'])
-    return cves
+            cves.add(entry['cve'])
+    return list(cves)
 
 # Function to check EOL status of a device
 def check_eol_status(device_version, eol_data):
@@ -259,6 +259,7 @@ def send_email(subject, body, attachment=None):
 
 # Main function
 def main():
+    start_time = datetime.now()
     try:
         token = authenticate()
         devices = get_devices(token)
@@ -268,12 +269,14 @@ def main():
             cpe_data = parse_cpe_data(cpe_data_path)
 
         eol_data = {}
-        if os.path.exists(eol_csv_file_path):
+        eol_data_exists = os.path.exists(eol_csv_file_path)
+        if eol_data_exists:
             eol_data = parse_eol_data(eol_csv_file_path)
 
         if not cpe_data and not eol_data:
+            print("No CVE/CPE or EOL data available. Nothing to do.")
             if enable_logging:
-                logging.info("No CPE or EOL data available. Nothing to do.")
+                logging.info("No CVE/CPE or EOL data available. Nothing to do.")
             return
 
         findings = []
@@ -301,11 +304,11 @@ def main():
                     if cpe_data:
                         cves = check_vulnerabilities(device_version, cpe_data)
                         if cves:
-                            result['Vulnerabilities'] = ', '.join(cves)
+                            result['Vulnerabilities'] = ', '.join(set(cves))
                             total_vulnerable_devices += 1
                             has_findings = True
 
-                    if eol_data:
+                    if eol_data_exists and eol_data:
                         eol_date = check_eol_status(device_version, eol_data)
                         if eol_date:
                             result['EOL Date'] = eol_date.strftime('%Y-%m-%d')
@@ -317,30 +320,31 @@ def main():
                         findings.append(result)
 
         if findings:
+            end_time = datetime.now()
+            run_duration = end_time - start_time
             if output_to_console:
                 for finding in findings:
                     print(finding)
             if output_to_csv:
                 with open(output_csv_path, 'w', newline='') as csvfile:
-                    fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP']
-                    if cpe_data:
-                        fieldnames.append('Vulnerabilities')
-                    if eol_data:
-                        fieldnames.append('EOL Date')
+                    fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities', 'EOL Date']
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     for finding in findings:
                         writer.writerow(finding)
 
-            if enable_email_alert:
-                email_body = (
-                    f"Total devices checked: {len(devices)}\n"
-                )
-                if cpe_data:
-                    email_body += f"Devices with vulnerabilities: {total_vulnerable_devices}\n"
-                if eol_data:
-                    email_body += f"Devices that are EOL: {total_eol_devices}\n"
+            email_body = (
+                f"Total devices checked: {len(devices)}\n"
+                f"Total devices with vulnerabilities: {total_vulnerable_devices}\n"
+                f"Script start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Script end time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Script run duration: {run_duration}\n"
+            )
 
+            if eol_data_exists:
+                email_body += f"Total devices with EOL versions: {total_eol_devices}\n"
+
+            if enable_email_alert:
                 if include_csv_attachment:
                     email_body += "\nFindings attached."
                     attachment = open(output_csv_path, 'rb')

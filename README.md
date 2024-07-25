@@ -1,5 +1,5 @@
 # Juniper Version Monitor for FireMon
-Checks for devices running JunOS versions with known vulnerabilities and/or EOL.
+Checks for devices running Junos versions with known vulnerabilities and/or EOL.
 * Currently does not support devices managed by Junos Space.
 
 

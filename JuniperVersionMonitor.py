@@ -21,7 +21,7 @@ from io import StringIO
 firemon_host = 'https://localhost'  # Script can be ran directly on FMOS app server
 username = 'firemon'  # FireMon GUI username
 password = 'firemon'  # FireMon GUI password
-device_group_id = 5  # Default device group to 5
+device_group_id = 1
 control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'  # Update this to match the uploaded control UUID
 cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
 eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates

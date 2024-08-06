@@ -278,6 +278,13 @@ def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss
 
     return vulnerabilities
 
+# Function to check if a device version is EOL
+def check_eol_status(device_version, eol_data):
+    for version, eol_date in eol_data.items():
+        if match_versions(device_version, version):
+            return eol_date
+    return None
+
 # Function to process each device
 def process_device(token, device, cpe_data, eol_data, cvss_threshold):
     vendor = device.get('devicePack', {}).get('vendor', '')

@@ -1,7 +1,5 @@
 # Juniper Version Monitor for FireMon
 Checks for devices running Junos versions with known vulnerabilities and/or EOL.
-* Currently does not support devices managed by Junos Space.
-
 
 ## JuniperVersionMonitor.py
 Script that checks for vulnerabilities or EOL versions. Can be ran directly on FMOS with no additional python packages, ad-hoc or on a cron schedule. 
@@ -9,6 +7,9 @@ This script references juniper_eol.csv (generated using scrapeEOL.py) and junos_
 
 ## fetchJunosCVE.py
 This script downloaded CPE and CVE data from nvd.nist.gov and stored as junos_cves.json. API key is optional. Rate limit to 5 requests per 30 seconds if no API key, and 50 requests per 30 seconds with API key. API Keys can be requested here: https://nvd.nist.gov/developers/request-an-api-key
+
+CVE dataset from 08/06/24: https://firemon.xyz/imports/junos_cves.json
+(too large to upload to GitHub)
 
 Standard FMOS Python libraries are used, so this can be ran directly in FMOS.
 

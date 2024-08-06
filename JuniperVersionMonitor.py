@@ -29,12 +29,12 @@ control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'  # Update this to match the 
 cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
 eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates
 ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
-cvss_threshold = 4.0  # Ignore CVEs with a CVSS score below this value
+cvss_threshold = 1.0  # Ignore CVEs with a CVSS score below this value
 
 # EOL checking configuration
 eol_notification_months = 6  # List if device will be EOL within this many months
 
-# Alert options
+# Output options
 enable_email_alert = True
 output_to_console = True
 output_to_csv = True  # Set to False to disable saving CSV locally
@@ -44,9 +44,9 @@ cve_csv_path = 'juniper_cve_report.csv'  # New CSV file path for CVE details
 # Logging
 enable_logging = True  # Set to False to disable logging
 log_file_path = 'juniper_version_report.log'
-logging_level = logging.INFO  # Set the desired logging level
-max_log_size = 5 * 1024 * 1024  # 5 MB (reduced from 10 MB)
-backup_log_count = 10  # Reduced from 50 to keep fewer backup files
+logging_level = logging.INFO  # Set the desired logging level (ERROR, WARN, INFO, DEBUG)
+max_log_size = 5 * 1024 * 1024  # 5 MB 
+backup_log_count = 5  # Number of log files to keep
 
 # Email configuration
 include_csv_attachment = True  # True adds CSV attachment, False has results in email body
@@ -277,13 +277,6 @@ def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss
             vulnerabilities.append(vulnerability_info)
 
     return vulnerabilities
-
-# Function to check if a device version is EOL
-def check_eol_status(device_version, eol_data):
-    for version, eol_date in eol_data.items():
-        if match_versions(device_version, version):
-            return eol_date
-    return None
 
 # Function to process each device
 def process_device(token, device, cpe_data, eol_data, cvss_threshold):

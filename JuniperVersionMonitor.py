@@ -12,6 +12,9 @@ import os
 import json
 from datetime import datetime, timedelta
 from io import StringIO
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import defaultdict
 
 #########################
 ## Begin Configuration ##
@@ -26,6 +29,7 @@ control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'  # Update this to match the 
 cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
 eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates
 ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
+cvss_threshold = 1.0  # Ignore CVEs with a CVSS score below this value
 
 # EOL checking configuration
 eol_notification_months = 6  # List if device will be EOL within this many months
@@ -34,14 +38,15 @@ eol_notification_months = 6  # List if device will be EOL within this many month
 enable_email_alert = True
 output_to_console = True
 output_to_csv = True  # Set to False to disable saving CSV locally
-output_csv_path = 'juniper_version_report.csv'
+output_csv_path = 'juniper_version_report.csv'  # Output CSV file path for device details
+cve_csv_path = 'juniper_cve_report.csv'  # Output CSV file path for CVE details
 
 # Logging
 enable_logging = True  # Set to False to disable logging
 log_file_path = 'juniper_version_report.log'
 logging_level = logging.DEBUG  # Set the desired logging level
-max_log_size = 10 * 1024 * 1024  # 10 MB
-backup_log_count = 5  # Number of backup log files to keep
+max_log_size = 5 * 1024 * 1024  # 5 MB
+backup_log_count = 10  # Reduced from 50 to keep fewer backup files
 
 # Email configuration
 include_csv_attachment = True  # True adds CSV attachment, False has results in email body
@@ -54,16 +59,31 @@ email_password = ''
 email_subject = 'Juniper Version Report'
 use_smtp_auth = False
 
+# Worker configuration
+max_workers = 10  # Max workers for concurrent API calls
+
 #######################
 ## End Configuration ##
 #######################
 
-
-
 # Set up logging
 if enable_logging:
-    handler = RotatingFileHandler(log_file_path, maxBytes=max_log_size, backupCount=backup_log_count)
-    logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[handler])
+    handler = RotatingFileHandler(
+        log_file_path, 
+        maxBytes=max_log_size, 
+        backupCount=backup_log_count
+    )
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging_level)
+    root_logger.addHandler(handler)
+
+    # Add a StreamHandler for console output if needed
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
 
 # Disable warnings for self-signed certificates
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -110,7 +130,7 @@ def get_devices(token):
             raise
 
     if enable_logging:
-        logging.info(f'Total devices retrieved: {len(devices)}')
+        logging.info(f'Total devices in device group: {len(devices)}')
     return devices
 
 # Function to retrieve the software version of a specific device
@@ -125,8 +145,12 @@ def get_device_version(token, device_id):
         regex_matches = data.get('regexMatches', [])
         if regex_matches:
             version_line = regex_matches[0].get('line', '')
-            version = version_line.strip().split('<version>')[1].split('</version>')[0]
-            return version
+            logging.debug(f'Version line for device {device_id}: {version_line}')
+            match = re.search(r'junos="http://xml.juniper.net/junos/([^/]+)(?:-EVO)?/junos"', version_line)
+            if match:
+                version = match.group(1)
+                logging.debug(f'Parsed version for device {device_id}: {version}')
+                return version
         return None
     except requests.exceptions.RequestException as e:
         if enable_logging:
@@ -137,17 +161,15 @@ def get_device_version(token, device_id):
 def parse_cpe_data(json_file_path):
     cpe_data = []
     if not os.path.exists(json_file_path):
-        if enable_logging:
-            logging.warning(f'CPE JSON file not found: {json_file_path}')
+        logging.warning(f'CPE JSON file not found: {json_file_path}')
         return cpe_data
     try:
         with open(json_file_path, 'r') as jsonfile:
             cpe_data = json.load(jsonfile)
-        if enable_logging:
-            logging.info(f'Parsed CPE data: {cpe_data}')
+        logging.debug(f'Parsed CPE data: {cpe_data}')  # Changed from INFO to DEBUG
+        logging.info(f'Successfully parsed {len(cpe_data)} CPE entries from {json_file_path}')
     except Exception as e:
-        if enable_logging:
-            logging.error(f'Error parsing CPE data: {e}')
+        logging.error(f'Error parsing CPE data: {e}')
         raise
     return cpe_data
 
@@ -155,9 +177,8 @@ def parse_cpe_data(json_file_path):
 def parse_eol_data(csv_file_path):
     eol_data = {}
     if not os.path.exists(csv_file_path):
-        if enable_logging:
-            logging.warning(f'EOL CSV file not found: {csv_file_path}')
-        return eol_data
+        logging.warning(f'EOL CSV file not found: {csv_file_path}')
+        return None
     try:
         with open(csv_file_path, mode='r') as csvfile:
             reader = csv.reader(csvfile)
@@ -177,67 +198,129 @@ def parse_eol_data(csv_file_path):
     except Exception as e:
         if enable_logging:
             logging.error(f'Error parsing EOL data: {e}')
-        raise
+        return None
 
     return eol_data
 
 # Function to parse the version parts correctly, including handling non-numeric parts
 def parse_version(version):
-    try:
-        parts = []
-        for part in version.replace('X', '.').replace('R', '.').split('.'):
-            sub_parts = []
-            for sub_part in part.split('-'):
-                if sub_part.isdigit():
-                    sub_parts.append(int(sub_part))
-                else:
-                    sub_parts.append(sub_part)
-            parts.append(sub_parts)
-        return parts
-    except Exception as e:
-        if enable_logging:
-            logging.error(f'Error parsing version: {e}')
-        return []
+    # Split version into main parts and potential service pack
+    main_parts = version.split('-')[0]
+    service_pack = version.split('-')[1] if '-' in version else ''
 
-# Function to check if the device version matches the CPE version pattern
+    # Parse main version parts
+    parts = main_parts.replace('R', '.').split('.')
+    parsed = [int(p) if p.isdigit() else p for p in parts]
+
+    # Parse service pack if present
+    if service_pack:
+        sp_parts = service_pack.replace('S', '.').split('.')
+        parsed.extend([int(p) if p.isdigit() else p for p in sp_parts])
+
+    return parsed
+
 def match_versions(device_version, cpe_version):
-    device_parts = parse_version(device_version)
+    device_parts = parse_version(device_version.replace("-EVO", ""))
     cpe_parts = parse_version(cpe_version)
 
-    for device_part, cpe_part in zip(device_parts, cpe_parts):
-        if device_part == cpe_part or cpe_part == "*":
+    # Compare each part of the version
+    for dev_part, cpe_part in zip(device_parts, cpe_parts):
+        if cpe_part == '*':
             continue
-        if isinstance(device_part, list) and isinstance(cpe_part, list):
-            for dp, cp in zip(device_part, cpe_part):
-                if dp != cp and cp != "*":
-                    return False
-        else:
+        if dev_part != cpe_part:
             return False
-    return True
 
-# Function to check if a device is vulnerable based on CPE data
-def check_vulnerabilities(device_version, cpe_data):
-    cves = set()
+    # If CPE version is shorter, it's a match (e.g., 23.2 matches 23.2R1)
+    return len(cpe_parts) <= len(device_parts)
+
+# Function to check if a device is vulnerable based on CPE data and collect detailed information
+def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss_threshold):
+    vulnerabilities = []
+    is_evolved = "-EVO" in device_version
+    device_version_without_evo = device_version.replace("-EVO", "")
+
     for entry in cpe_data:
-        cpe_version = entry['cpe'].split(':')[5]
-        if match_versions(device_version, cpe_version):
-            cves.add(entry['cve'])
-    return list(cves)
+        try:
+            if entry['cvss_score'] != 'N/A' and float(entry['cvss_score']) < cvss_threshold:
+                continue
+        except ValueError:
+            # If CVSS score is 'N/A' or not a valid float, we'll include it
+            pass
 
-# Function to check EOL status of a device
-def check_eol_status(device_version, eol_data):
-    eol_date = None
-    device_parts = parse_version(device_version)
-    most_specific_length = 0
-    for eol_version, date in eol_data.items():
-        eol_parts = parse_version(eol_version)
-        if device_parts[:len(eol_parts)] == eol_parts and len(eol_parts) > most_specific_length:
-            eol_date = date
-            most_specific_length = len(eol_parts)
-    return eol_date
+        cpe = entry['cpe']
+        cpe_parts = cpe.split(':')
+        cpe_version = cpe_parts[5]
+
+        # Check if the CPE is for the correct Junos variant (Evolved or standard)
+        if is_evolved and not cpe.startswith("cpe:2.3:o:juniper:junos_os_evolved"):
+            continue
+        if not is_evolved and not cpe.startswith("cpe:2.3:o:juniper:junos"):
+            continue
+
+        logging.debug(f"Matching device version {device_version_without_evo} against CPE version {cpe_version}")
+        if match_versions(device_version_without_evo, cpe_version):
+            logging.debug(f"Matched CPE {cpe} for device {device_name} with version {device_version}")
+            vulnerability_info = {
+                'Device Name': device_name,
+                'Device IP': device_ip,
+                'cve': entry['cve'],
+                'description': entry['description'],
+                'severity': entry['severity'],
+                'cvss_score': entry['cvss_score'],
+                'attackVector': entry['attackVector'],
+                'attackComplexity': entry['attackComplexity'],
+                'availabilityImpact': entry['availabilityImpact'],
+                'exploitabilityScore': entry['exploitabilityScore'],
+                'impactScore': entry['impactScore'],
+                'vendorAdvisory': entry['vendorAdvisory']
+            }
+            vulnerabilities.append(vulnerability_info)
+
+    return vulnerabilities
+
+# Function to process each device
+def process_device(token, device, cpe_data, eol_data, cvss_threshold):
+    vendor = device.get('devicePack', {}).get('vendor', '')
+    artifact_id = device.get('devicePack', {}).get('artifactId', '')
+    management_ip = device.get('managementIp', 'N/A')
+    is_juniper = vendor == 'Juniper Networks' and artifact_id in ['juniper_ex', 'juniper_mseries', 'juniper_srx', 'juniper_qfx']
+    
+    if is_juniper:
+        device_id = device.get('id', '')
+        device_name = device.get('name', '')
+        device_version = get_device_version(token, device_id)
+        if device_version:
+            logging.debug(f"Processing device {device_name} with version {device_version}")
+            is_evolved = "-EVO" in device_version
+            logging.debug(f"Is Evolved: {is_evolved}")
+            result = {
+                'Device ID': device_id,
+                'Device Name': device_name,
+                'Device Version': device_version,
+                'Management IP': management_ip
+            }
+            has_findings = False
+
+            if cpe_data:
+                cves = check_vulnerabilities(device_version, cpe_data, device_name, management_ip, cvss_threshold)
+                if cves:
+                    result['Vulnerabilities'] = ', '.join(set([cve['cve'] for cve in cves]))
+                    has_findings = True
+
+            if eol_data:
+                eol_date = check_eol_status(device_version, eol_data)
+                if eol_date and eol_date <= datetime.now() + timedelta(days=eol_notification_months * 30):
+                    result['EOL Date'] = eol_date.strftime('%Y-%m-%d')
+                    has_findings = True
+
+            if has_findings:
+                result['Junos OS Type'] = 'Junos OS Evolved' if '-EVO' in device_version else 'Junos'
+                return result, is_juniper, cves if cves else []
+        return None, is_juniper, []
+    return None, is_juniper, []
 
 # Function to send an email with the results
-def send_email(subject, body, attachment=None):
+def send_email(subject, body, attachments=None):
     try:
         msg = MIMEMultipart()
         msg['From'] = email_sender
@@ -245,10 +328,12 @@ def send_email(subject, body, attachment=None):
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
-        if attachment:
-            part = MIMEApplication(attachment.read(), Name=os.path.basename(output_csv_path))
-            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(output_csv_path)}"'
-            msg.attach(part)
+        if attachments:
+            for attachment_path in attachments:
+                with open(attachment_path, 'rb') as attachment:
+                    part = MIMEApplication(attachment.read(), Name=os.path.basename(attachment_path))
+                    part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
+                    msg.attach(part)
 
         server = smtplib.SMTP(email_server, email_port)
         if use_smtp_auth:
@@ -273,10 +358,7 @@ def main():
         if os.path.exists(cpe_data_path):
             cpe_data = parse_cpe_data(cpe_data_path)
 
-        eol_data = {}
-        eol_data_exists = os.path.exists(eol_csv_file_path)
-        if eol_data_exists:
-            eol_data = parse_eol_data(eol_csv_file_path)
+        eol_data = parse_eol_data(eol_csv_file_path) if os.path.exists(eol_csv_file_path) else None
 
         if not cpe_data and not eol_data:
             print("No CVE/CPE or EOL data available. Nothing to do.")
@@ -285,82 +367,99 @@ def main():
             return
 
         findings = []
-        total_vulnerable_devices = 0
+        total_vulnerable_devices = set()
         total_eol_devices = 0
+        total_juniper_devices_checked = 0
+        total_juniper_devices = 0
+        total_devices = len(devices)
+        cve_details = defaultdict(set)
 
-        for device in devices:
-            vendor = device.get('devicePack', {}).get('vendor', '')
-            artifact_id = device.get('devicePack', {}).get('artifactId', '')
-            management_ip = device.get('managementIp', 'N/A')
-            if vendor == 'Juniper Networks' and artifact_id in ['juniper_ex', 'juniper_mseries', 'juniper_srx', 'juniper_qfx']:
-                device_id = device.get('id', '')
-                device_name = device.get('name', '')
-                device_version = get_device_version(token, device_id)
-                if device_version:
-                    result = {
-                        'Device ID': device_id,
-                        'Device Name': device_name,
-                        'Device Version': device_version,
-                        'Management IP': management_ip
-                    }
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(process_device, token, device, cpe_data, eol_data, cvss_threshold) for device in devices]
 
-                    has_findings = False
-
-                    if cpe_data:
-                        cves = check_vulnerabilities(device_version, cpe_data)
-                        if cves:
-                            result['Vulnerabilities'] = ', '.join(set(cves))
-                            total_vulnerable_devices += 1
-                            has_findings = True
-
-                    if eol_data_exists and eol_data:
-                        eol_date = check_eol_status(device_version, eol_data)
-                        if eol_date and eol_date <= datetime.now() + timedelta(days=eol_notification_months * 30):
-                            result['EOL Date'] = eol_date.strftime('%Y-%m-%d')
-                            total_eol_devices += 1
-                            has_findings = True
-
-                    if has_findings:
+            for future in as_completed(futures):
+                result, is_juniper, cves = future.result()
+                if is_juniper:
+                    total_juniper_devices += 1
+                    total_juniper_devices_checked += 1
+                    if result:
                         findings.append(result)
+                        if 'Vulnerabilities' in result:
+                            total_vulnerable_devices.add(result['Device ID'])
+                        if 'EOL Date' in result:
+                            total_eol_devices += 1
+                        for cve in cves:
+                            cve_key = (cve['cve'], cve['description'], cve['severity'], cve['cvss_score'], cve['attackVector'], cve['attackComplexity'], cve['availabilityImpact'], cve['exploitabilityScore'], cve['impactScore'], cve['vendorAdvisory'])
+                            device_info = f"{result['Device Name']} ({result['Management IP']})"
+                            cve_details[cve_key].add(device_info)
 
         if findings:
             end_time = datetime.now()
-            run_duration = end_time - start_time
+            run_duration = (end_time - start_time).total_seconds()
             if output_to_console:
                 for finding in findings:
                     print(finding)
+
+            fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities', 'Junos OS Type']
+            if eol_data:
+                fieldnames.insert(-1, 'EOL Date')
+
             if output_to_csv:
-                fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities']
-                if any('EOL Date' in finding for finding in findings):
-                    fieldnames.append('EOL Date')
                 with open(output_csv_path, 'w', newline='') as csvfile:
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     for finding in findings:
                         writer.writerow(finding)
 
+                # Update the CVE details CSV
+                cve_fieldnames = ['cve', 'description', 'severity', 'cvss_score', 'attackVector', 'attackComplexity', 'availabilityImpact', 'exploitabilityScore', 'impactScore', 'vendorAdvisory', 'Device Count', 'Affected Devices']
+                with open(cve_csv_path, 'w', newline='') as cvefile:
+                    writer = csv.DictWriter(cvefile, fieldnames=cve_fieldnames)
+                    writer.writeheader()
+                    for cve_key, devices in cve_details.items():
+                        cve_data = {
+                            'cve': cve_key[0],
+                            'description': cve_key[1],
+                            'severity': cve_key[2],
+                            'cvss_score': cve_key[3],
+                            'attackVector': cve_key[4],
+                            'attackComplexity': cve_key[5],
+                            'availabilityImpact': cve_key[6],
+                            'exploitabilityScore': cve_key[7],
+                            'impactScore': cve_key[8],
+                            'vendorAdvisory': cve_key[9],
+                            'Device Count': len(devices),
+                            'Affected Devices': ', '.join(devices)
+                        }
+                        writer.writerow(cve_data)
+
             email_body = (
-                f"Total devices checked: {len(devices)}\n"
-                f"Total devices with vulnerabilities: {total_vulnerable_devices}\n"
+                f"Total devices in device group: {total_devices}\n"
+                f"Total Juniper devices checked: {total_juniper_devices_checked}\n"
+                f"Total devices with vulnerabilities: {len(total_vulnerable_devices)}\n"
+            )
+            if eol_data:
+                email_body += f"Total devices with EOL versions: {total_eol_devices}\n"
+            email_body += (
                 f"Script start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Script end time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"Script run duration: {run_duration}\n"
+                f"Script run duration: {round(run_duration)} seconds\n"
             )
 
-            if eol_data_exists:
-                email_body += f"Total devices with EOL versions: {total_eol_devices}\n"
+            if output_to_console:
+                print(email_body)
 
             if enable_email_alert:
                 if include_csv_attachment:
                     email_body += "\nFindings attached."
-                    attachment = open(output_csv_path, 'rb')
+                    attachments = [output_csv_path, cve_csv_path]
                 else:
                     email_body += "\nFindings:\n"
                     for finding in findings:
                         email_body += "\n".join([f"{key}: {value}" for key, value in finding.items()]) + "\n\n"
-                    attachment = None
+                    attachments = None
 
-                send_email(email_subject, email_body, attachment)
+                send_email(email_subject, email_body, attachments)
 
     except Exception as e:
         if enable_logging:

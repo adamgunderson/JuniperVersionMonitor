@@ -2,8 +2,8 @@
   "assessments": [],
   "controls": [
     {
-      "id": "eca59354-4bdb-4754-acb2-eeffb756860d",
-      "controlCode": "UD-01445",
+      "id": "d718f39b-2403-4663-8ec7-bb5b02095f95",
+      "controlCode": "UD-00010",
       "controlType": "REGEX",
       "domainId": 1,
       "name": "Juniper Version Check",
@@ -12,7 +12,7 @@
       "system": false,
       "properties": [
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "FailWhenResultsExist",
           "type": "BOOLEAN",
@@ -21,15 +21,16 @@
           "booleanValue": true
         },
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "FilenamesToSearch",
           "type": "STRING",
           "displayName": "Filenames To Search",
-          "required": false
+          "required": false,
+          "string": "config_xml"
         },
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "InfoOnly",
           "type": "BOOLEAN",
@@ -38,7 +39,7 @@
           "booleanValue": true
         },
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "MaxLineLength",
           "type": "INTEGER",
@@ -47,45 +48,50 @@
           "integerValue": 160
         },
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "Pattern",
           "type": "STRING",
           "displayName": "Pattern",
           "required": true,
-          "string": "(?:<version>).*"
+          "string": "<rpc-reply xmlns:junos=\\\"http://xml.juniper.net/junos/([^/]+)/junos\\\">"
         },
         {
-          "controlId": "eca59354-4bdb-4754-acb2-eeffb756860d",
+          "controlId": "d718f39b-2403-4663-8ec7-bb5b02095f95",
           "controlType": "REGEX",
           "name": "SearchAllFiles",
           "type": "BOOLEAN",
           "displayName": "Search All Files",
           "required": true,
-          "booleanValue": true
+          "booleanValue": false
         }
       ],
       "filters": [
         {
-          "id": "a4da1e9d-035b-40b3-a183-32c4ffca7b9f",
-          "type": "VENDOR",
-          "vendor": "Juniper Networks"
+          "id": "04c74234-1452-4cb7-ae4a-607a94f6d5af",
+          "type": "DEVICE_TYPE",
+          "deviceType": "DEVICE_MGR"
         },
         {
-          "id": "a33ab989-ad4c-4259-9ffa-51b93a4b6d30",
+          "id": "bc33ef7f-03c6-413c-9f12-bbbad339f2e0",
           "type": "DEVICE_TYPE",
           "deviceType": "FIREWALL"
         },
         {
-          "id": "11c9f317-486e-439b-a507-69182f345ff0",
+          "id": "9935d0b3-6d63-4d2d-8fb4-40bd1504f038",
+          "type": "VENDOR",
+          "vendor": "Juniper Networks"
+        },
+        {
+          "id": "93107cf3-4548-47e2-bdf1-e4b372fd82c3",
           "type": "DEVICE_TYPE",
           "deviceType": "ROUTER_SWITCH"
         }
       ],
-      "createdBy": "adam",
-      "createdDate": "2024-07-18T23:33:38.376Z",
-      "lastModifiedBy": "adam",
-      "lastModifiedDate": "2024-07-18T23:33:38.376Z",
+      "createdBy": "firemon",
+      "createdDate": "2024-07-18T19:24:48.910Z",
+      "lastModifiedBy": "firemon",
+      "lastModifiedDate": "2024-07-18T19:24:48.910Z",
       "observesSystemRules": false
     }
   ],

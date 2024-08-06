@@ -44,7 +44,7 @@ cve_csv_path = 'juniper_cve_report.csv'  # Output CSV file path for CVE details
 # Logging
 enable_logging = True  # Set to False to disable logging
 log_file_path = 'juniper_version_report.log'
-logging_level = logging.DEBUG  # Set the desired logging level
+logging_level = logging.INFO  # Set the desired logging level
 max_log_size = 5 * 1024 * 1024  # 5 MB
 backup_log_count = 10  # Reduced from 50 to keep fewer backup files
 

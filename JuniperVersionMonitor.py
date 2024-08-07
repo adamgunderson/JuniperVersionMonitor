@@ -173,6 +173,13 @@ def parse_cpe_data(json_file_path):
         raise
     return cpe_data
 
+# Function for checking if a device's version is approaching or past its End of Life (EOL) date.
+def check_eol_status(device_version, eol_data):
+    for version, eol_date in eol_data.items():
+        if match_versions(device_version, version):
+            return eol_date
+    return None
+
 # Function to parse EOL data from a CSV file
 def parse_eol_data(csv_file_path):
     eol_data = {}

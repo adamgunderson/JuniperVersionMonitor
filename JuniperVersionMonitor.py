@@ -199,7 +199,7 @@ def parse_eol_data(csv_file_path):
                     if enable_logging:
                         logging.warning(f'Skipping invalid date format for product: {product}, EOL Date: {eol_date_str}')
         if enable_logging:
-            logging.info(f'Parsed EOL data: {eol_data}')
+            logging.debug(f'Parsed EOL data: {eol_data}')
     except Exception as e:
         if enable_logging:
             logging.error(f'Error parsing EOL data: {e}')

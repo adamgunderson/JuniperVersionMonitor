@@ -7,64 +7,56 @@ from email.mime.application import MIMEApplication
 import csv
 import requests
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import json
+import yaml
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 from io import StringIO
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 
-#########################
-## Begin Configuration ##
-#########################
+# Load Configuration from config.yaml
+with open('config.yaml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
 
-# Configuration
-firemon_host = 'https://localhost'  # Script can be ran directly on FMOS app server
-username = 'firemon'  # FireMon GUI username
-password = 'firemon'  # FireMon GUI password
-device_group_id = 1
-control_id = 'd718f39b-2403-4663-8ec7-bb5b02095f95'  # Update this to match the uploaded control UUID
-cpe_data_path = 'junos_cves.json'  # Input file of CPEs and associated CVEs
-eol_csv_file_path = 'juniper_eol.csv'  # Input file of Junos Version and EOL dates
-ignore_certificate = True  # Ignore certificate validation, useful for self-signed certificates
-cvss_threshold = 1.0  # Ignore CVEs with a CVSS score below this value
+# Set Configuration Variables
+firemon_host = config["firemon_host"]
+username = config["username"]
+password = config["password"]
+device_group_id = config["device_group_id"]
+control_id = config["control_id"]
+cpe_data_path = config["cpe_data_path"]
+eol_csv_file_path = config["eol_csv_file_path"]
+ignore_certificate = config["ignore_certificate"]
+cvss_threshold = config["cvss_threshold"]
 
-# EOL checking configuration
-eol_notification_months = 6  # List if device will be EOL within this many months
+eol_notification_months = config["eol_notification_months"]
 
-# Output options
-enable_email_alert = True
-output_to_console = True
-output_to_csv = True  # Set to False to disable saving CSV locally
-output_csv_path = 'juniper_version_report.csv'
-cve_csv_path = 'juniper_cve_report.csv'  # New CSV file path for CVE details
+enable_email_alert = config["enable_email_alert"]
+output_to_console = config["output_to_console"]
+output_to_csv = config["output_to_csv"]
+output_csv_path = config["output_csv_path"]
+cve_csv_path = config["cve_csv_path"]
 
-# Logging
-enable_logging = True  # Set to False to disable logging
-log_file_path = 'juniper_version_report.log'
-logging_level = logging.INFO  # Set the desired logging level (ERROR, WARN, INFO, DEBUG)
-max_log_size = 5 * 1024 * 1024  # 5 MB 
-backup_log_count = 5  # Number of log files to keep
+enable_logging = config["enable_logging"]
+log_file_path = config["log_file_path"]
+logging_level = getattr(logging, config["logging_level"])
+max_log_size = config["max_log_size"]
+backup_log_count = config["backup_log_count"]
 
-# Email configuration
-include_csv_attachment = True  # True adds CSV attachment, False has results in email body
-email_sender = 'JuniperVersionReport@firemon.com'
-email_recipient = 'adam.gunderson@firemon.com'  # Use your own email address unless you want me to get your report
-email_server = 'localhost'
-email_port = 25
-email_username = ''
-email_password = ''
-email_subject = 'Juniper Version Report'
-use_smtp_auth = False
+include_csv_attachment = config["include_csv_attachment"]
+email_sender = config["email_sender"]
+email_recipient = config["email_recipient"]
+email_server = config["email_server"]
+email_port = config["email_port"]
+email_username = config["email_username"]
+email_password = config["email_password"]
+email_subject = config["email_subject"]
+use_smtp_auth = config["use_smtp_auth"]
 
-# Worker configuration
-max_workers = 10  # Max workers for concurrent API calls
-
-#######################
-## End Configuration ##
-#######################
+max_workers = config["max_workers"]
 
 # Set up logging
 if enable_logging:
@@ -146,8 +138,7 @@ def get_device_version(token, device_id):
         if regex_matches:
             version_line = regex_matches[0].get('line', '')
             logging.debug(f'Version line for device {device_id}: {version_line}')
-            # New regex pattern to match the version in the <version> tag
-            match = re.search(r'<version>([^<]+)</version>', version_line)
+            match = re.search(r'junos="http://xml.juniper.net/junos/([^/]+)(?:-EVO)?/junos"', version_line)
             if match:
                 version = match.group(1)
                 logging.debug(f'Parsed version for device {device_id}: {version}')

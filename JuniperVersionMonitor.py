@@ -246,6 +246,10 @@ def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss
     is_evolved = "-EVO" in device_version
     device_version_without_evo = device_version.replace("-EVO", "")
 
+    logging.debug(f"Checking vulnerabilities for device: {device_name}")
+    logging.debug(f"Device version: {device_version}")
+    logging.debug(f"Is EVO: {is_evolved}")
+
     for entry in cpe_data:
         try:
             if entry['cvss_score'] != 'N/A' and float(entry['cvss_score']) < cvss_threshold:
@@ -257,14 +261,18 @@ def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss
         cpe = entry['cpe']
         cpe_parts = cpe.split(':')
         cpe_version = cpe_parts[5]
+        is_cpe_evolved = "junos_os_evolved" in cpe
 
         # Check if the CPE is for the correct Junos variant (Evolved or standard)
-        if is_evolved and not cpe.startswith("cpe:2.3:o:juniper:junos_os_evolved"):
+        if is_evolved and not is_cpe_evolved:
+            logging.debug(f"Skipping non-EVO CPE {cpe} for EVO device")
             continue
-        if not is_evolved and not cpe.startswith("cpe:2.3:o:juniper:junos"):
+        if not is_evolved and is_cpe_evolved:
+            logging.debug(f"Skipping EVO CPE {cpe} for non-EVO device")
             continue
 
         logging.debug(f"Matching device version {device_version_without_evo} against CPE version {cpe_version}")
+        logging.debug(f"CPE: {cpe}")
         if match_versions(device_version_without_evo, cpe_version):
             logging.debug(f"Matched CPE {cpe} for device {device_name} with version {device_version}")
             vulnerability_info = {
@@ -282,7 +290,10 @@ def check_vulnerabilities(device_version, cpe_data, device_name, device_ip, cvss
                 'vendorAdvisory': entry['vendorAdvisory']
             }
             vulnerabilities.append(vulnerability_info)
+        else:
+            logging.debug(f"Did not match CPE {cpe} for device {device_name} with version {device_version}")
 
+    logging.debug(f"Found {len(vulnerabilities)} vulnerabilities for device {device_name}")
     return vulnerabilities
 
 # Function to process each device

@@ -138,7 +138,7 @@ def get_device_version(token, device_id):
         if regex_matches:
             version_line = regex_matches[0].get('line', '')
             logging.debug(f'Version line for device {device_id}: {version_line}')
-            match = re.search(r'junos="http://xml.juniper.net/junos/([^/]+)(?:-EVO)?/junos"', version_line)
+            match = re.search(r'<version>([^<]+)</version>', version_line)
             if match:
                 version = match.group(1)
                 logging.debug(f'Parsed version for device {device_id}: {version}')

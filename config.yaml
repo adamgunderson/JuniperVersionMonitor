@@ -1,0 +1,47 @@
+# FireMon API Configuration
+firemon_host: "https://localhost"  # Base URL for the FireMon API
+username: "firemon"  # FireMon GUI username
+password: "firemon"  # FireMon GUI password
+device_group_id: 1  # Device group ID to target
+control_id: "d718f39b-2403-4663-8ec7-bb5b02095f95"  # Control UUID to use in API calls
+
+# Paths to Data Files
+cpe_data_path: "junos_cves.json"  # Path to the JSON file containing CPE and CVE data
+eol_csv_file_path: "juniper_eol.csv"  # Path to the CSV file containing Junos EOL dates
+
+# SSL Certificate Handling
+ignore_certificate: true  # Ignore SSL certificate validation (useful for self-signed certificates)
+
+# CVSS Score Threshold
+cvss_threshold: 1.0  # Ignore CVEs with a CVSS score below this value
+
+# EOL Notification Configuration
+eol_notification_months: 6  # Notify if device EOL is within this many months
+
+# Output Options
+enable_email_alert: true  # Send an email alert with the findings
+output_to_console: true  # Print findings to the console
+output_to_csv: true  # Save findings to CSV files
+output_csv_path: "juniper_version_report.csv"  # Path to save the main findings CSV
+cve_csv_path: "juniper_cve_report.csv"  # Path to save the CVE details CSV
+
+# Logging Configuration
+enable_logging: true  # Enable logging
+log_file_path: "juniper_version_report.log"  # Path to save the log file
+logging_level: "INFO"  # Logging level (ERROR, WARN, INFO, DEBUG)
+max_log_size: 5242880  # Maximum log file size in bytes (5 MB)
+backup_log_count: 5  # Number of backup log files to keep
+
+# Email Configuration
+include_csv_attachment: true  # Include CSV files as attachments in the email
+email_sender: "JuniperVersionReport@firemon.com"  # Sender email address
+email_recipient: "adam.gunderson@firemon.com"  # Recipient email address
+email_server: "localhost"  # SMTP server for sending the email
+email_port: 25  # Port number for the SMTP server
+email_username: ""  # SMTP username (if authentication is required)
+email_password: ""  # SMTP password (if authentication is required)
+email_subject: "Juniper Version Report"  # Subject line of the email
+use_smtp_auth: false  # Whether to use SMTP authentication
+
+# Worker Configuration
+max_workers: 10  # Number of concurrent workers for API calls

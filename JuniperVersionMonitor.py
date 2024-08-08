@@ -99,7 +99,7 @@ def authenticate():
 def get_devices(token):
     devices = []
     page = 0
-    page_size = 50  # Increase page size for fewer requests
+    page_size = 500  # Increase page size for fewer requests
 
     logging.info(f"Starting to retrieve devices from device group {device_group_id}")
     while True:

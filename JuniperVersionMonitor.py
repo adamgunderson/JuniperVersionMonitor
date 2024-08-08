@@ -144,6 +144,14 @@ def get_device_version(token, device_id):
                 logging.debug(f'Parsed version for device {device_id}: {version}')
                 return version
         return None
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400:
+            if enable_logging:
+                logging.warning(f'Error retrieving version for device ID {device_id}: {e}. Check if the device has any revisions.')
+        else:
+            if enable_logging:
+                logging.error(f'Error retrieving version for device ID {device_id}: {e}')
+        return None
     except requests.exceptions.RequestException as e:
         if enable_logging:
             logging.error(f'Error retrieving version for device ID {device_id}: {e}')

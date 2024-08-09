@@ -80,6 +80,32 @@ if enable_logging:
 # Disable warnings for self-signed certificates
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
+def ensure_directory_exists(file_path):
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+            logging.info(f"Created directory: {directory}")
+        except OSError as e:
+            logging.error(f"Error creating directory {directory}: {e}")
+            raise
+
+def write_csv(file_path, fieldnames, data):
+    try:
+        ensure_directory_exists(file_path)
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in data:
+                writer.writerow(row)
+        logging.info(f"Successfully wrote CSV to: {file_path}")
+    except IOError as e:
+        logging.error(f"IOError writing CSV to {file_path}: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error writing CSV to {file_path}: {e}")
+        raise
+
 # Function to authenticate to FireMon and get an authentication token
 def authenticate():
     url = f'{firemon_host}/securitymanager/api/authentication/login'
@@ -423,11 +449,36 @@ def main():
             run_duration = (end_time - start_time).total_seconds()
 
             if output_to_csv:
-                logging.info(f"Writing results to CSV: {output_csv_path}")
-                # ... (CSV writing code remains the same)
+                try:
+                    logging.info(f"Writing results to CSV: {output_csv_path}")
+                    fieldnames = ['Device ID', 'Device Name', 'Device Version', 'Management IP', 'Vulnerabilities', 'Junos OS Type']
+                    if eol_data:
+                        fieldnames.insert(-1, 'EOL Date')
+                    write_csv(output_csv_path, fieldnames, findings)
 
-                logging.info(f"Writing CVE details to CSV: {cve_csv_path}")
-                # ... (CVE details CSV writing code remains the same)
+                    logging.info(f"Writing CVE details to CSV: {cve_csv_path}")
+                    cve_fieldnames = ['cve', 'description', 'severity', 'cvss_score', 'attackVector', 'attackComplexity', 'availabilityImpact', 'exploitabilityScore', 'impactScore', 'vendorAdvisory', 'Device Count', 'Affected Devices']
+                    cve_data = [
+                        {
+                            'cve': cve_key[0],
+                            'description': cve_key[1],
+                            'severity': cve_key[2],
+                            'cvss_score': cve_key[3],
+                            'attackVector': cve_key[4],
+                            'attackComplexity': cve_key[5],
+                            'availabilityImpact': cve_key[6],
+                            'exploitabilityScore': cve_key[7],
+                            'impactScore': cve_key[8],
+                            'vendorAdvisory': cve_key[9],
+                            'Device Count': len(devices),
+                            'Affected Devices': ', '.join(devices)
+                        }
+                        for cve_key, devices in cve_details.items()
+                    ]
+                    write_csv(cve_csv_path, cve_fieldnames, cve_data)
+                except Exception as e:
+                    logging.error(f"Failed to write CSV files: {e}")
+                    # Optionally, you might want to set a flag here to indicate that CSV files are not available for email attachment
 
             email_body = (
                 f"Total devices in device group: {total_devices}\n"
@@ -447,16 +498,23 @@ def main():
 
             if enable_email_alert:
                 logging.info("Sending email alert")
+                attachments = []
                 if include_csv_attachment:
                     email_body += "\nFindings attached."
-                    attachments = [output_csv_path, cve_csv_path]
+                    if os.path.exists(output_csv_path):
+                        attachments.append(output_csv_path)
+                    else:
+                        logging.warning(f"CSV file not found for attachment: {output_csv_path}")
+                    if os.path.exists(cve_csv_path):
+                        attachments.append(cve_csv_path)
+                    else:
+                        logging.warning(f"CSV file not found for attachment: {cve_csv_path}")
                 else:
                     email_body += "\nFindings:\n"
                     for finding in findings:
                         email_body += "\n".join([f"{key}: {value}" for key, value in finding.items()]) + "\n\n"
-                    attachments = None
 
-                send_email(email_subject, email_body, attachments)
+                send_email(email_subject, email_body, attachments if attachments else None)
         else:
             logging.info("No findings to report.")
 

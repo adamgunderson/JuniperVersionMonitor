@@ -1,11 +1,20 @@
 import sys
-sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.9/site-packages')  # Adjust this path based on your version of FMOS.
+# Adding FireMon package path
+sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.8/site-packages')
+try:
+    import requests
+except:
+    try:
+        sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.9/site-packages')
+        import requests
+    except:
+        sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.10/site-packages')
+        import requests
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 import csv
-import requests
 import logging
 from logging.handlers import RotatingFileHandler
 import os

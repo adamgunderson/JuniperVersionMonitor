@@ -1,9 +1,47 @@
+#!/usr/bin/python
 import sys
-sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.9/site-packages')  # Adjust this path based on your version of FMOS.
-import smtplib
-import requests
+import os
 import json
 import time
+
+def ensure_module(module_name):
+    """Dynamically import a module by searching for it in potential site-packages locations"""
+    # First try the normal import in case it's already in the path
+    try:
+        return __import__(module_name)
+    except ImportError:
+        pass
+    
+    # Get the current Python version
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    
+    # Create a list of potential paths to check
+    base_path = '/usr/lib/firemon/devpackfw/lib'
+    potential_paths = [
+        # Current Python version
+        f"{base_path}/python{py_version}/site-packages",
+        # Exact Python version with patch
+        f"{base_path}/python{sys.version.split()[0]}/site-packages",
+        # Try a range of nearby versions (for future-proofing)
+        *[f"{base_path}/python3.{i}/site-packages" for i in range(8, 20)]
+    ]
+    
+    # Try each path
+    for path in potential_paths:
+        if os.path.exists(path):
+            if path not in sys.path:
+                sys.path.append(path)
+            try:
+                return __import__(module_name)
+            except ImportError:
+                continue
+    
+    # If we get here, we couldn't find the module
+    raise ImportError(f"Could not find module {module_name} in any potential site-packages location")
+
+# Import required modules
+requests = ensure_module("requests")
+smtplib = ensure_module("smtplib")
 
 API_KEY = ""  # Set this to None or "" if no API key is used
 CPE_BASE_URL = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
@@ -117,4 +155,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

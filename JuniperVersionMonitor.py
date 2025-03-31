@@ -1,15 +1,47 @@
+#!/usr/bin/python
 import sys
-# Adding FireMon package path
-sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.8/site-packages')
-try:
-    import requests
-except:
+import os
+import importlib.util
+
+def ensure_module(module_name):
+    """Dynamically import a module by searching for it in potential site-packages locations"""
+    # First try the normal import in case it's already in the path
     try:
-        sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.9/site-packages')
-        import requests
-    except:
-        sys.path.append('/usr/lib/firemon/devpackfw/lib/python3.10/site-packages')
-        import requests
+        return __import__(module_name)
+    except ImportError:
+        pass
+    
+    # Get the current Python version
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    
+    # Create a list of potential paths to check
+    base_path = '/usr/lib/firemon/devpackfw/lib'
+    potential_paths = [
+        # Current Python version
+        f"{base_path}/python{py_version}/site-packages",
+        # Exact Python version with patch
+        f"{base_path}/python{sys.version.split()[0]}/site-packages",
+        # Try a range of nearby versions (for future-proofing)
+        *[f"{base_path}/python3.{i}/site-packages" for i in range(8, 20)]
+    ]
+    
+    # Try each path
+    for path in potential_paths:
+        if os.path.exists(path):
+            if path not in sys.path:
+                sys.path.append(path)
+            try:
+                return __import__(module_name)
+            except ImportError:
+                continue
+    
+    # If we get here, we couldn't find the module
+    raise ImportError(f"Could not find module {module_name} in any potential site-packages location")
+
+# Import required modules
+requests = ensure_module("requests")
+
+# Standard library imports
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -17,7 +49,6 @@ from email.mime.application import MIMEApplication
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
-import os
 import json
 from datetime import datetime, timedelta
 from io import StringIO
